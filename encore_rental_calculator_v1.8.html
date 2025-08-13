@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Encore Rental Calculator</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #1a1444; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+    .calculator-container { background: linear-gradient(180deg, #ffffff, #f9f9f9); border-radius: 22px; box-shadow: 0 8px 28px rgba(0,0,0,0.18); padding: 35px 28px; max-width: 450px; width: 100%; display: flex; flex-direction: column; justify-content: center; }
+    h2 { text-align: center; margin-bottom: 25px; color: #2a3d55; font-size: 1.65em; letter-spacing: 0.5px; }
+    label { font-weight: 500; display: block; margin: 15px 0 6px; color: #333; }
+    input { padding: 9px 12px; font-size: 15px; width: 94%; border-radius: 8px; border: 1px solid #cfd8e3; outline: none; transition: border 0.2s ease, box-shadow 0.2s ease; }
+    input:focus { border-color: #4a90e2; box-shadow: 0 0 0 3px rgba(74,144,226,0.2); }
+    button { margin-top: 12px; padding: 12px; font-size: 16px; border-radius: 8px; border: none; cursor: pointer; }
+    .calculate-btn { background: #4a90e2; color: white; font-weight: 600; width: 100%; transition: background 0.3s ease; }
+    .calculate-btn:hover { background: #357ab8; }
+    .clear-btn { background: #e74c3c; color: white; font-weight: 600; width: 100%; }
+    .clear-btn:hover { background: #c0392b; }
+    .result { margin-top: 20px; padding: 16px; text-align: center; font-size: 1.5em; font-weight: bold; color: #2a3d55; background: #f0f8ff; border-radius: 10px; border: 1px solid #c2e0ff; }
+    .suggestion { margin-top: 10px; font-size: 14px; color: #2a3d55; }
+    .savings { margin-top: 6px; font-size: 14px; color: green; }
+    .collapsible { margin-top: 18px; background: #f5f8fc; color: #333; cursor: pointer; padding: 12px; border: none; text-align: left; outline: none; font-size: 16px; font-weight: 500; border-radius: 8px; width: 100%; }
+    .collapsible:after { content: '\25BC'; float: right; }
+    .collapsible.active:after { content: '\25B2'; }
+    .content { max-height: 0; overflow: hidden; margin-top: 10px; background: white; border: 1px solid #dbe4f0; border-radius: 8px; padding: 0 12px; transition: max-height 0.4s ease, padding 0.4s ease; }
+    .content.open { padding: 12px; }
+    table { width: 100%; border-collapse: collapse; font-size: 15px; }
+    table td { padding: 6px 4px; }
+    table tr:nth-child(odd) { background: #f9fcff; }
+  </style>
+</head>
+<body>
+
+<div class="calculator-container">
+  <h2>Encore Rental Calculator</h2>
+
+  <label for="rental">Base Rental Amount ($):</label>
+  <input type="number" id="rental" placeholder="e.g. 270" step="0.01" min="0" required>
+
+  <label for="days">Number of Days:</label>
+  <input type="number" id="days" placeholder="e.g. 1" step="1" min="1" value="1" required>
+
+  <label for="discount">Discount (%):</label>
+  <input type="number" id="discount" placeholder="Custom discount" step="0.1" min="0" value="0" required>
+
+  <div class="suggestion" id="multiDaySuggestion"></div>
+  <div class="savings" id="discountSavings"></div>
+
+  <button class="calculate-btn" type="button" onclick="calculateTotal()">Calculate Total</button>
+  <button class="clear-btn" type="button" onclick="clearAll()">Clear All</button>
+
+  <div class="result" id="result">Total will appear here</div>
+
+  <button type="button" class="collapsible" id="breakdownBtn">Show Breakdown</button>
+  <div class="content" id="breakdownContent">
+    <table>
+      <tbody>
+        <tr><td>Base Rental (Before Tax):</td><td id="baseBeforeTax"></td></tr>
+        <tr><td>Rental After Tax:</td><td id="taxedRental"></td></tr>
+        <tr><td>Discount Applied:</td><td id="discountAmount"></td></tr>
+        <tr><td>Rental After Discount:</td><td id="discountedRental"></td></tr>
+        <tr><td>Service Fee (with Tax):</td><td id="serviceFee"></td></tr>
+        <tr><td>LDW Fee (with Tax):</td><td id="ldwFee"></td></tr>
+        <tr><td><strong>Total Fees:</strong></td><td id="totalFees"></td></tr>
+        <tr><td><strong>Number of Days:</strong></td><td id="daysValue"></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+function calculateTotal() {
+  const rental = parseFloat(document.getElementById("rental").value);
+  const days = parseInt(document.getElementById("days").value);
+  let discountPercent = parseFloat(document.getElementById("discount").value);
+
+  if (isNaN(rental) || rental <= 0) {
+    document.getElementById("result").innerText = "Please enter a valid rental amount.";
+    return;
+  }
+  if (isNaN(days) || days <= 0) {
+    document.getElementById("result").innerText = "Please enter a valid number of days.";
+    return;
+  }
+  if (isNaN(discountPercent) || discountPercent < 0 || discountPercent > 25) {
+    document.getElementById("result").innerText = "Please enter a valid discount percentage (0-25).";
+    return;
+  }
+
+  // Multi-day discount suggestion
+  let suggestedDiscount = 0;
+  if (days >= 2 && days <= 3) suggestedDiscount = 5;
+  else if (days >= 4 && days <= 6) suggestedDiscount = 10;
+  else if (days >= 7) suggestedDiscount = 15;
+
+  const multiDaySuggestion = document.getElementById("multiDaySuggestion");
+  if (suggestedDiscount > 0) {
+    multiDaySuggestion.innerText = `Suggested discount for ${days} days: ${suggestedDiscount}%`;
+  } else {
+    multiDaySuggestion.innerText = '';
+  }
+
+  const taxRate = 0.0891;
+  const serviceChargeRate = 0.25;
+  const ldwRate = 0.04;
+
+  const totalRental = rental * days;
+  const taxedRental = totalRental * (1 + taxRate);
+  const discountAmount = taxedRental * (discountPercent / 100);
+  const discountedRental = taxedRental - discountAmount;
+
+  const serviceFee = totalRental * serviceChargeRate * (1 + taxRate);
+  const ldwFee = totalRental * ldwRate * (1 + taxRate);
+  const totalFees = serviceFee + ldwFee;
+
+  const total = discountedRental + totalFees;
+
+  document.getElementById("result").innerText = `Total Cost: $${total.toFixed(2)}`;
+  document.getElementById("discountSavings").innerText = `Discount Savings: $${discountAmount.toFixed(2)}`;
+
+  // Populate breakdown
+  document.getElementById("baseBeforeTax").innerText = `$${totalRental.toFixed(2)}`;
+  document.getElementById("taxedRental").innerText = `$${taxedRental.toFixed(2)}`;
+  document.getElementById("discountAmount").innerText = `-$${discountAmount.toFixed(2)}`;
+  document.getElementById("discountedRental").innerText = `$${discountedRental.toFixed(2)}`;
+  document.getElementById("serviceFee").innerText = `$${serviceFee.toFixed(2)}`;
+  document.getElementById("ldwFee").innerText = `$${ldwFee.toFixed(2)}`;
+  document.getElementById("totalFees").innerText = `$${totalFees.toFixed(2)}`;
+  document.getElementById("daysValue").innerText = days;
+}
+
+function clearAll() {
+  document.getElementById("rental").value = '';
+  document.getElementById("days").value = 1;
+  document.getElementById("discount").value = 0;
+  document.getElementById("result").innerText = 'Total will appear here';
+  document.getElementById("multiDaySuggestion").innerText = '';
+  document.getElementById("discountSavings").innerText = '';
+  document.getElementById("baseBeforeTax").innerText = '';
+  document.getElementById("taxedRental").innerText = '';
+  document.getElementById("discountAmount").innerText = '';
+  document.getElementById("discountedRental").innerText = '';
+  document.getElementById("serviceFee").innerText = '';
+  document.getElementById("ldwFee").innerText = '';
+  document.getElementById("totalFees").innerText = '';
+  document.getElementById("daysValue").innerText = '';
+}
+
+// Collapsible breakdown
+document.getElementById("breakdownBtn").addEventListener("click", function() {
+  this.classList.toggle("active");
+  const content = document.getElementById("breakdownContent");
+  if (content.style.maxHeight) {
+    content.style.maxHeight = null;
+    content.classList.remove("open");
+  } else {
+    content.style.maxHeight = content.scrollHeight + "px";
+    content.classList.add("open");
+  }
+});
+</script>
+
+</body>
+</html>
