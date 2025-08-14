@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Encore Rental Calculator</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  body {
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+    background: #1a1444;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 20px;
+  }
+  .calculator-container {
+    background: linear-gradient(180deg, #ffffff, #f9f9f9);
+    border-radius: 22px;
+    box-shadow: 0 8px 28px rgba(0,0,0,0.18);
+    padding: 35px 28px;
+    max-width: 480px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    transition: max-height 0.5s ease;
+    overflow: hidden;
+  }
+  h2 { text-align: center; margin-bottom: 25px; color: #2a3d55; font-size: 1.65em; letter-spacing: 0.5px; }
+  label { font-weight: 500; display: block; margin: 15px 0 6px; color: #333; }
+  input { padding: 9px 12px; font-size: 15px; width: 94%; border-radius: 8px; border: 1px solid #cfd8e3; outline: none; transition: border 0.2s ease, box-shadow 0.2s ease; }
+  input:focus { border-color: #4a90e2; box-shadow: 0 0 0 3px rgba(74,144,226,0.2); }
+
+  button {
+    margin-top: 12px;
+    padding: 12px;
+    font-size: 16px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    transition: transform 0.1s ease;
+  }
+  button:active { transform: scale(0.97); }
+  .calculate-btn { background: #4a90e2; color: white; font-weight: 600; width: 100%; transition: background 0.3s ease; }
+  .calculate-btn:hover { background: #357ab8; }
+  .clear-btn { background: #e74c3c; color: white; font-weight: 600; width: 100%; }
+  .clear-btn:hover { background: #c0392b; }
+  .suggestion { margin-top: 10px; font-size: 14px; color: #2a3d55; }
+
+  #resultsSection { display: none; flex-direction: column; margin-top: 16px; transition: all 0.5s ease; }
+  .result { padding: 16px; text-align: center; font-size: 1.5em; font-weight: bold; color: #2a3d55; background: #f0f8ff; border-radius: 10px; border: 1px solid #c2e0ff; margin-bottom: 8px; }
+  .savings { font-size: 1.2em; color: green; opacity: 0; transition: opacity 0.5s ease; margin-bottom: 12px; text-align: center; }
+
+  .collapsible { margin-top: 18px; background: #f5f8fc; color: #333; cursor: pointer; padding: 12px; border: none; text-align: left; outline: none; font-size: 16px; font-weight: 500; border-radius: 8px; width: 100%; }
+  .collapsible:after { content: '\25BC'; float: right; }
+  .collapsible.active:after { content: '\25B2'; }
+  .content { max-height: 0; overflow: hidden; margin-top: 10px; background: white; border: 1px solid #dbe4f0; border-radius: 8px; padding: 0 12px; transition: max-height 0.4s ease, padding 0.4s ease; }
+  .content.open { padding: 12px; }
+  .breakdown-steps { display: flex; flex-direction: column; gap: 8px; padding: 6px 2px 10px; }
+  .step { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 8px 10px; border-radius: 10px; }
+  .step .label { color: #2a3d55; }
+  .step .muted { color: #6b7280; font-weight: 400; font-size: 0.9em; margin-left: 4px; }
+  .step .value { font-variant-numeric: tabular-nums; }
+  .step.hl { background: #f6fbff; border: 1px solid #cfe8ff; }
+  .step.fee { background: #f9fdf7; border: 1px solid #d7f0c8; }
+  .step.final { background: #f0fdf4; border: 1px solid #bbf7d0; font-size: 1.06em; }
+  .value.neg { color: #b91c1c; font-weight: 600; }
+  .divider { height: 1px; background: repeating-linear-gradient(90deg, #dbe4f0, #dbe4f0 6px, transparent 6px, transparent 12px); margin: 6px 4px; }
+</style>
+</head>
+<body>
+
+<div class="calculator-container" id="calculatorContainer">
+  <h2>Encore Rental Calculator</h2>
+
+  <label for="rental">Base Rental Amount ($):</label>
+  <input type="number" id="rental" placeholder="e.g. 270" step="0.01" min="0" required>
+
+  <label for="days">Number of Days:</label>
+  <input type="number" id="days" placeholder="e.g. 1" step="1" min="1" value="1" required>
+
+  <label for="discount">Discount (%):</label>
+  <input type="number" id="discount" placeholder="Custom discount" step="0.1" min="0" value="0" required>
+
+  <div class="suggestion" id="multiDaySuggestion"></div>
+
+  <button class="calculate-btn" id="calculateBtn" type="button">Calculate Total</button>
+  <button class="clear-btn" id="clearBtn" type="button">Clear All</button>
+
+  <div id="resultsSection">
+    <div class="result" id="result"></div>
+    <div class="savings" id="discountSavings"></div>
+    <button type="button" class="collapsible" id="breakdownBtn">Show Breakdown</button>
+    <div class="content" id="breakdownContent">
+      <div id="breakdownSteps" class="breakdown-steps"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+function calculateTotal() {
+  const rental = parseFloat(document.getElementById("rental").value);
+  const days = parseInt(document.getElementById("days").value);
+  const discountPercent = parseFloat(document.getElementById("discount").value);
+
+  if (isNaN(rental) || rental <= 0) { alert("Enter a valid rental amount."); return; }
+  if (isNaN(days) || days <= 0) { alert("Enter a valid number of days."); return; }
+  if (isNaN(discountPercent) || discountPercent < 0 || discountPercent > 25) { alert("Discount must be 0–25."); return; }
+
+  let suggestedDiscount = 0;
+  if (days >= 2 && days <= 3) suggestedDiscount = 5;
+  else if (days >= 4 && days <= 6) suggestedDiscount = 10;
+  else if (days >= 7) suggestedDiscount = 15;
+  document.getElementById("multiDaySuggestion").innerText = suggestedDiscount > 0 ? `Suggested discount for ${days} days: ${suggestedDiscount}%` : '';
+
+  const taxRate = 0.0891;
+  const serviceChargeRate = 0.25;
+  const ldwRate = 0.04;
+
+  const totalRental = rental * days;
+  const rentalTax = totalRental * taxRate;
+  const taxedRental = totalRental + rentalTax;
+  const discountAmount = taxedRental * (discountPercent / 100);
+  const priceAfterDiscount = taxedRental - discountAmount;
+  const serviceFee = totalRental * serviceChargeRate * (1 + taxRate);
+  const ldwFee = totalRental * ldwRate * (1 + taxRate);
+  const grandTotal = priceAfterDiscount + serviceFee + ldwFee;
+
+  const fmt = n => `$${n.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}`;
+  const pct = p => `${(p*100).toFixed(1)}%`;
+
+  const resultsSection = document.getElementById("resultsSection");
+  resultsSection.style.display = "flex";
+  resultsSection.style.opacity = 0;
+  resultsSection.style.maxHeight = "0px";
+  setTimeout(() => {
+    resultsSection.style.transition = "opacity 0.5s ease, max-height 0.5s ease";
+    resultsSection.style.opacity = 1;
+    resultsSection.style.maxHeight = "1000px";
+  }, 10);
+
+  const savingsEl = document.getElementById("discountSavings");
+  savingsEl.style.opacity = 0;
+  savingsEl.style.fontSize = '1.25em';
+  savingsEl.innerText = `Discount Savings: ${fmt(discountAmount)}`;
+  setTimeout(() => { savingsEl.style.opacity = 1; }, 300);
+
+  document.getElementById("result").innerText = `Total Cost: ${fmt(grandTotal)}`;
+
+  const breakdownHTML = `
+    <div class="step hl">
+      <div class="label"><strong>Base rental</strong><span class="muted"> (${fmt(rental)} × ${days} day${days>1?'s':''})</span></div>
+      <div class="value"><strong>${fmt(totalRental)}</strong></div>
+    </div>
+    <div class="step">
+      <div class="label">Tax on rental <span class="muted">(${pct(taxRate)})</span></div>
+      <div class="value">+ ${fmt(rentalTax)}</div>
+    </div>
+    <div class="step hl">
+      <div class="label"><strong>Rental after tax</strong></div>
+      <div class="value"><strong>${fmt(taxedRental)}</strong></div>
+    </div>
+    <div class="step">
+      <div class="label">Discount <span class="muted">(${discountPercent.toFixed(1)}%)</span></div>
+      <div class="value neg">− ${fmt(discountAmount)}</div>
+    </div>
+    <div class="step hl">
+      <div class="label"><strong>Price after discount</strong></div>
+      <div class="value"><strong>${fmt(priceAfterDiscount)}</strong></div>
+    </div>
+    <div class="divider"></div>
+    <div class="step fee">
+      <div class="label"><strong>Service charge</strong><span class="muted"> (${pct(serviceChargeRate)} with tax)</span></div>
+      <div class="value">+ <strong>${fmt(serviceFee)}</strong></div>
+    </div>
+    <div class="step fee">
+      <div class="label"><strong>LDW fee</strong><span class="muted"> (${pct(ldwRate)} with tax)</span></div>
+      <div class="value">+ <strong>${fmt(ldwFee)}</strong></div>
+    </div>
+    <div class="step final">
+      <div class="label"><strong>Grand total</strong><span class="muted"> (Price after discount + Total fees)</span></div>
+      <div class="value"><strong>${fmt(grandTotal)}</strong></div>
+    </div>
+  `;
+  document.getElementById('breakdownSteps').innerHTML = breakdownHTML;
+}
+
+function clearAll() {
+  document.getElementById("rental").value = '';
+  document.getElementById("days").value = 1;
+  document.getElementById("discount").value = 0;
+  document.getElementById("multiDaySuggestion").innerText = '';
+  const savingsEl = document.getElementById("discountSavings");
+  savingsEl.innerText = '';
+  savingsEl.style.opacity = 0;
+  document.getElementById("result").innerText = '';
+  document.getElementById('breakdownSteps').innerHTML = '';
+  const resultsSection = document.getElementById("resultsSection");
+  resultsSection.style.display = "none";
+  resultsSection.style.opacity = 0;
+  resultsSection.style.maxHeight = "0px";
+
+  const breakdownBtn = document.getElementById('breakdownBtn');
+  const breakdownContent = document.getElementById('breakdownContent');
+  breakdownBtn.classList.remove('active');
+  breakdownContent.style.maxHeight = '0px';
+  breakdownContent.classList.remove('open');
+}
+
+document.getElementById("calculateBtn").addEventListener("click", calculateTotal);
+document.getElementById("clearBtn").addEventListener("click", clearAll);
+
+document.getElementById("breakdownBtn").addEventListener("click", function() {
+  this.classList.toggle("active");
+  const content = document.getElementById("breakdownContent");
+  if (content.style.maxHeight && content.style.maxHeight !== "0px") { 
+    content.style.maxHeight = "0px"; 
+    content.classList.remove("open"); 
+  } else { 
+    content.style.maxHeight = content.scrollHeight + "px"; 
+    content.classList.add("open"); 
+  }
+});
+</script>
+
+</body>
+</html>
